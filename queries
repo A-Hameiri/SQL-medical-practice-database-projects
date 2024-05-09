@@ -1,4 +1,4 @@
-touch quUSE MedicalPractice;
+USE MedicalPractice;
 
 --List the first name and last name of female patients who live in St Kilda or Lidcombe--
 SELECT FirstName, LastName
