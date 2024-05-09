@@ -1,0 +1,210 @@
+USE MedicalPractice;
+
+--Create a view (called vwNurseDays) with the name and phone details of any nurse-- 
+--(registered or not) and the days that they work.--
+CREATE VIEW vwNurseDays
+AS
+SELECT 
+    FirstName,
+    LastName,
+    COALESCE(HomePhone, MobilePhone) AS Phone,
+    WeekDayName
+FROM 
+    Practitioner p
+JOIN 
+    Availability a ON p.Practitioner_ID = a.Practitioner_Ref
+JOIN 
+    WeekDays w ON a.WeekDayName_Ref = w.WeekDayName
+WHERE 
+    PractitionerType_Ref = 'Nurse';
+
+
+--Using view, to retrieve the name and phone number details of all nurses who are scheduled to work on a Wednesday.--
+SELECT 
+    FirstName,
+    LastName,
+    Phone
+FROM 
+    vwNurseDays
+WHERE 
+    WeekDayName = 'Wednesday';
+
+
+--Create a view (called vwNSWPatients) that contains all patient details for patients whose address is in NSW.--
+CREATE VIEW vwNSWPatients 
+AS
+SELECT *
+FROM Patient
+WHERE State = 'NSW';
+
+
+--Create a stored procedure (called spSelect_vwNSWPatients) to retrieve all records and--
+--columns from vwNSWPatients in postcode order ascending--
+
+CREATE PROCEDURE spSelect_vwNSWPatients
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT *
+    FROM vwNSWPatients
+    ORDER BY PostCode ASC;
+END;
+
+
+--Create a stored procedure (called spInsert_vwNSWPatients) to insert a new record into--
+--vwNSWPatients, using parameters for all relevant data.-- 
+CREATE PROCEDURE spInsert_vwNSWPatients
+    @Title NVARCHAR(20),
+    @FirstName NVARCHAR(50),
+    @MiddleInitial NCHAR(1),
+    @LastName NVARCHAR(50),
+    @HouseUnitLotNum NVARCHAR(5),
+    @Street NVARCHAR(50),
+    @Suburb NVARCHAR(50),
+    @State NVARCHAR(3),
+    @PostCode NCHAR(4),
+    @HomePhone NCHAR(10),
+    @MobilePhone NCHAR(10),
+    @MedicareNumber NCHAR(16),
+    @DateOfBirth DATE,
+    @Gender NVARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO Patient (
+        Title,
+        FirstName,
+        MiddleInitial,
+        LastName,
+        HouseUnitLotNum,
+        Street,
+        Suburb,
+        State,
+        PostCode,
+        HomePhone,
+        MobilePhone,
+        MedicareNumber,
+        DateOfBirth,
+        Gender
+    )
+    VALUES (
+        @Title,
+        @FirstName,
+        @MiddleInitial,
+        @LastName,
+        @HouseUnitLotNum,
+        @Street,
+        @Suburb,
+        @State,
+        @PostCode,
+        @HomePhone,
+        @MobilePhone,
+        @MedicareNumber,
+        @DateOfBirth,
+        @Gender
+    );
+END;
+--Execute the stored procedure inserting a record for a new patient--
+--named Mr Mickey M Mouse from 1 Smith St, Smithville, NSW 2222.-- 
+EXEC spInsert_vwNSWPatients
+    @Title = 'Mr',
+    @FirstName = 'Mickey',
+    @MiddleInitial = 'M',
+    @LastName = 'Mouse',
+    @HouseUnitLotNum = '1',
+    @Street = 'Smith St',
+    @Suburb = 'Smithville',
+    @State = 'NSW',
+    @PostCode = '2222',
+    @HomePhone = '1234567890',
+    @MobilePhone = '0987654321',
+    @MedicareNumber = '1234567890',
+    @DateOfBirth = '01/01/1990',
+    @Gender = 'Male';
+
+
+--Create a stored procedure (called spModify_PractitionerMobilePhone) using the Practitioner table to--
+--change a practitioner s mobile phone number, using the Practitioner ID and the new mobile number--
+--as parameters.--
+CREATE PROCEDURE spModify_PractitionerMobilePhone
+    @Practitioner_ID INTEGER,
+    @NewMobilePhone NCHAR(14)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Practitioner
+    SET MobilePhone = @NewMobilePhone
+    WHERE Practitioner_ID = @Practitioner_ID;
+END;
+--Execute the stored procedure to change Hilda Brown s mobile number to 0412345678.--
+DECLARE @PractitionerID INT;
+
+SELECT @PractitionerID = Practitioner_ID 
+FROM Practitioner 
+WHERE FirstName = 'Hilda' AND LastName = 'Brown';
+
+EXEC spModify_PractitionerMobilePhone
+    @Practitioner_ID = @PractitionerID,
+    @NewMobilePhone = '0412345678';
+--Run a query to verify that the record has been updated in the Practitioner table.--
+SELECT *
+FROM Practitioner
+WHERE FirstName = 'Hilda' AND LastName = 'Brown';
+
+
+--Manipulate the Practitioner table to store a driver s licence number. For privacy and security--
+--purposes this data needs to be encrypted. Name the new column DriversLicenceHash. For encrypting--
+--the column, use a one-way hashing algorithm.-- Execute the statement to create the new column.
+ALTER TABLE Practitioner
+ADD DriversLicenceHash NVARCHAR(64);
+--Add the driver's licence number of 1066AD Dr Ludo Vergenargen s (Practitioner ID 10005) drivers licence using a SHA hashing function.--
+UPDATE Practitioner
+SET DriversLicenceHash = HASHBYTES('SHA2_256', '1066AD')
+WHERE Practitioner_ID = 10005;
+--Display Dr Vertenargen s record to view the hashed number--
+SELECT 
+    Practitioner_ID, 
+    Title, 
+    FirstName, 
+    LastName, 
+    DriversLicenceHash 
+FROM 
+    Practitioner 
+WHERE 
+    LastName = 'Vergenargen';
+
+
+
+--Manipulate the Patient table to add a new column that will store a date value which is--
+--the last date they made contact. The default value should be the date of record creation.--
+--Name the new column LastContactDate. Execute the statement to create the new column.--
+ALTER TABLE Patient
+ADD LastContactDate DATE DEFAULT GETDATE();
+
+
+--Create a trigger on the Appointment table that will update LastContactDate on the Patient table--
+--each time a new record is added to the Appointment table. The value of the LastContactDate should--
+--be the date the record is added. Name the trigger tr_Appointment_AfterInsert.--
+CREATE TRIGGER tr_Appointment_AfterInsert
+ON Appointment
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Patient
+    SET LastContactDate = GETDATE()
+    WHERE Patient_ID IN (SELECT Patient_Ref FROM inserted);
+END;
+
+
+--Delete the view vwNurseDays from the database.--
+DROP VIEW IF EXISTS vwNurseDays;
+
+
+--Delete the stored procedure spSelect_vwNSWPatients from the database.--
+DROP PROCEDURE IF EXISTS spSelect_vwNSWPatients;
+
