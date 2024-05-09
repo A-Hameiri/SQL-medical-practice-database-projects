@@ -1,0 +1,217 @@
+touch quUSE MedicalPractice;
+
+--List the first name and last name of female patients who live in St Kilda or Lidcombe--
+SELECT FirstName, LastName
+FROM Patient
+WHERE Gender = 'Female'
+AND Suburb IN ('St Kilda', 'Lidcombe');
+
+
+--List the first name, last name, state and Medicare Number of any patients who do not live in NSW--
+SELECT FirstName, LastName, State, MedicareNumber
+FROM Patient
+WHERE State <> 'NSW';
+
+
+--List each patient's first name, last name, Medicare Number and date of birth,--
+--Sort the list by date of birth, listing the youngest patients first--
+SELECT FirstName, LastName, MedicareNumber, DateOfBirth
+FROM Patient
+ORDER BY DateOfBirth DESC;
+
+
+--For each practitioner, list their ID, first name, last name, the total number of days and--
+--the total number of hours they are scheduled to work in a standard week at the Medical Practice--
+--Assume a workday is nine hours long--
+SELECT
+    p.Practitioner_ID,
+    p.FirstName,
+    p.LastName,
+    COUNT(DISTINCT a.ApptDate) AS TotalDays,
+    COUNT(*) * 9 AS TotalHours
+FROM
+    Practitioner p
+LEFT JOIN
+    Appointment a ON p.Practitioner_ID = a.Practitioner_Ref
+GROUP BY
+    p.Practitioner_ID,
+    p.FirstName,
+    p.LastName;
+
+
+--List the Patient's first name, last name and the appointment date and time,--
+--for all appointments held on 18/09/2019 by Dr Anne Funsworth.--
+SELECT 
+    pt.FirstName,
+    pt.LastName,
+    a.ApptDate,
+    a.ApptStartTime
+FROM 
+    Appointment a
+INNER JOIN 
+    Practitioner p ON a.Practitioner_Ref = p.Practitioner_ID
+INNER JOIN 
+    Patient pt ON a.Patient_Ref = pt.Patient_ID
+WHERE 
+    p.FirstName = 'Anne' AND 
+    p.LastName = 'Funsworth' AND 
+    a.ApptDate = '18/09/2019';
+
+
+--List the ID and date of birth of any patient who has not had an appointment and was born before 1950.--
+SELECT Patient_ID, DateOfBirth
+FROM Patient
+WHERE DateOfBirth < '1950-01-01' AND Patient_ID NOT IN (
+    SELECT Patient_Ref
+    FROM Appointment
+);
+
+
+--List the patient ID, first name, last name and the number of appointments for patients who have had at least three appointments.--
+--List the patients in 'number of appointments' order from most to least.--
+SELECT 
+    p.Patient_ID,
+    p.FirstName,
+    p.LastName,
+    COUNT(a.Patient_Ref) AS NumAppointments
+FROM 
+    Patient p
+INNER JOIN 
+    Appointment a ON p.Patient_ID = a.Patient_Ref
+GROUP BY 
+    p.Patient_ID,
+    p.FirstName,
+    p.LastName
+HAVING 
+    COUNT(a.Patient_Ref) >= 3
+ORDER BY 
+    NumAppointments DESC;
+
+
+--List the first name, last name, gender, and the number of days since the last appointment of each patient and 23/09/2019.--
+SELECT 
+    p.FirstName,
+    p.LastName,
+    p.Gender,
+    DATEDIFF(day, MAX(CONVERT(DATE, a.ApptDate, 103)), '2019-09-23') AS DaysSinceLastAppointment
+FROM 
+    Patient p
+LEFT JOIN 
+    Appointment a ON p.Patient_ID = a.Patient_Ref
+GROUP BY 
+    p.Patient_ID,
+    p.FirstName,
+    p.LastName,
+    p.Gender;
+
+
+--List the full name and full address of each practitioner in the following format exactly.
+--Dr Mark P. Huston. 21 Fuller Street SUNSHINE, NSW 2343--
+--Make sure you include the punctuation and the suburb in upper case.--
+--Sort the list by last name, then first name, then middle initial.--
+SELECT 
+    CONCAT('Dr ', p.FirstName, ' ', 
+           CASE WHEN LEN(p.MiddleInitial) > 0 THEN p.MiddleInitial + '. ' ELSE '' END, 
+           p.LastName, '. ', 
+           p.HouseUnitLotNum, ' ', 
+           p.Street, ' ', 
+           UPPER(p.Suburb), ', ', 
+           p.State, ' ', 
+           p.PostCode) AS FullNameAndAddress
+FROM 
+    Practitioner p
+WHERE
+    p.Practitioner_ID NOT IN (
+        SELECT DISTINCT Practitioner_Ref
+        FROM Appointment
+        WHERE ApptDate >= '23/09/2019'
+    )
+    OR p.Practitioner_ID IS NULL
+ORDER BY 
+    p.LastName, p.FirstName, p.MiddleInitial;
+
+
+--List the patient id, first name, last name and date of birth of the fifth oldest patient(s).--
+SELECT TOP 1 WITH TIES
+    Patient_ID,
+    FirstName,
+    LastName,
+    DateOfBirth
+FROM 
+    Patient
+ORDER BY 
+    DateOfBirth ASC;
+
+
+--List the patient ID, first name, last name, appointment date (in the format 'Tuesday 17 September, 2019')--
+--and appointment time (in the format '14:15 PM') for all patients--
+--who have had appointments on any Tuesday after 10:00 AM.--
+SELECT 
+    p.Patient_ID,
+    p.FirstName,
+    p.LastName,
+    FORMAT(CONVERT(DATE, a.ApptDate, 103), 'dddd dd MMMM, yyyy') AS AppointmentDate,
+    FORMAT(CONVERT(TIME, a.ApptStartTime), 'hh:mm tt') AS AppointmentTime
+FROM 
+    Patient p
+INNER JOIN 
+    Appointment a ON p.Patient_ID = a.Patient_Ref
+WHERE 
+    DATENAME(weekday, CONVERT(DATE, a.ApptDate, 103)) = 'Tuesday'
+    AND CONVERT(TIME, a.ApptStartTime) > '10:00:00';
+
+
+--Create an address list for a special newsletter to all patients and practitioners.--
+--The mailing list should contain all relevant address fields for each household.--
+--Note that each household should only receive one newsletter.--
+WITH MailingList AS (
+    SELECT 
+        'Patient' AS RecipientType,
+        Patient_ID AS RecipientID,
+        Title,
+        FirstName,
+        LastName,
+        HouseUnitLotNum,
+        Street,
+        Suburb,
+        State,
+        PostCode
+    FROM 
+        Patient
+    UNION
+    SELECT 
+        'Practitioner' AS RecipientType,
+        Practitioner_ID AS RecipientID,
+        Title,
+        FirstName,
+        LastName,
+        HouseUnitLotNum,
+        Street,
+        Suburb,
+        State,
+        PostCode
+    FROM 
+        Practitioner
+)
+SELECT 
+    RecipientType,
+    RecipientID,
+    Title,
+    FirstName,
+    LastName,
+    HouseUnitLotNum,
+    Street,
+    Suburb,
+    State,
+    PostCode
+FROM 
+    (
+        SELECT 
+            *,
+            ROW_NUMBER() OVER(PARTITION BY HouseUnitLotNum, Street, Suburb, State, PostCode ORDER BY RecipientType) AS RowNum
+        FROM 
+            MailingList
+    ) AS AddressList
+WHERE 
+    RowNum = 1;
+
