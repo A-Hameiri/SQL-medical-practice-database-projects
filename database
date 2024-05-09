@@ -1,0 +1,207 @@
+-- Query to drop and recreate database--
+
+USE master;
+GO
+
+ALTER DATABASE MedicalPractice
+SET SINGLE_USER
+WITH ROLLBACK IMMEDIATE;
+
+
+
+DROP DATABASE IF EXISTS MedicalPractice;
+
+
+CREATE DATABASE MedicalPractice;
+
+-- Setting database to be used--
+USE MedicalPractice;
+
+-- creating tables with primary and alternate keys--
+CREATE TABLE Patient (
+Patient_ID INTEGER NOT NULL,
+Title NVARCHAR(20),
+FirstName NVARCHAR(50)NOT NULL ,
+MiddleInitial NCHAR(1),
+LastName NVARCHAR(50) NOT NULL,
+HouseUnitLotNum  NVARCHAR(5) NOT NULL,
+Street NVARCHAR(50) NOT NULL,
+Suburb NVARCHAR(50) NOT NULL,
+State NVARCHAR(3) NOT NULL,
+PostCode NCHAR(4) NOT NULL,
+HomePhone NCHAR(10),
+MobilePhone NCHAR(10),
+MedicareNumber NCHAR(16),
+DateOfBirth DATE NOT NULL  ,
+Gender NVARCHAR(20) NOT NULL,
+
+CONSTRAINT PATIENT_pk PRIMARY KEY (Patient_ID));
+
+
+CREATE TABLE Practitioner (
+Practitioner_ID INTEGER NOT NULL,
+Title NVARCHAR(20),
+FirstName NVARCHAR(50)NOT NULL ,
+MiddleInitial NCHAR(1),
+LastName NVARCHAR(50) NOT NULL,
+HouseUnitLotNum  NVARCHAR(5) NOT NULL,
+Street NVARCHAR(50) NOT NULL,
+Suburb NVARCHAR(50) NOT NULL,
+State NVARCHAR(3) NOT NULL,
+PostCode NCHAR(4) NOT NULL,
+HomePhone NCHAR(10),
+MobilePhone NCHAR(10),
+MedicareNumber NCHAR(16),
+MedicalRegistrationNumber NCHAR(11) NOT NULL,  
+DateOfBirth  DATE NOT NULL ,
+Gender NVARCHAR(20) NOT NULL,
+PractitionerType_Ref NVARCHAR(50) NOT NULL,
+
+CONSTRAINT PRACTITIONER_pk PRIMARY KEY (Practitioner_ID)
+);
+CREATE UNIQUE INDEX PRACTITIONER_idx ON PRACTITIONER(MedicalRegistrationNumber);
+
+
+CREATE TABLE WeekDays (
+WeekDayName NVARCHAR(9) NOT NULL,
+
+CONSTRAINT WEEKDAYS_pk PRIMARY KEY (WeekDayName)
+);
+
+
+
+CREATE TABLE Availability (
+Practitioner_Ref INTEGER NOT NULL,
+WeekDayName_Ref NVARCHAR(9) NOT NULL,
+--Composite primary key--
+CONSTRAINT AVAILABILITY_pk PRIMARY KEY ( Practitioner_Ref, WeekDayName_Ref)
+);
+
+
+ ALTER TABLE AVAILABILITY ADD CONSTRAINT WEEKDAYS_AVAILABILITY_fk FOREIGN KEY (WeekDayName_Ref)
+ REFERENCES WEEKDAYS (WeekDayName);
+
+
+-- second foreign key for this table--
+ ALTER TABLE AVAILABILITY ADD CONSTRAINT PRACTITIONER_AVAILABILITY_fk FOREIGN KEY (Practitioner_Ref)
+ REFERENCES PRACTITIONER (Practitioner_ID);
+
+
+
+CREATE TABLE PractitionerType (
+PractitionerType NVARCHAR(50) NOT NULL,
+
+CONSTRAINT PRACTITIONERTYPE_pk PRIMARY KEY (PractitionerType)
+);
+
+
+
+
+CREATE TABLE Appointment (
+Practitioner_Ref INTEGER NOT NULL,
+ApptDate DATE NOT NULL,
+ApptStartTime TIME NOT NULL ,
+Patient_Ref INTEGER NOT NULL,
+--Composite primary key--
+CONSTRAINT APPOINTMENT_pk PRIMARY KEY (Practitioner_Ref, ApptDate, ApptStartTime)
+);
+
+--Alternate keys--
+CREATE INDEX ApptDate_idx ON Appointment (ApptDate);
+
+CREATE INDEX ApptStartTime_idx
+ON Appointment (ApptStartTime);
+
+CREATE INDEX Patient_Ref_idx
+ON Appointment (Patient_Ref);
+
+-- foreign keys--
+  ALTER TABLE APPOINTMENT ADD CONSTRAINT PRACTITIONER_APPOINTMENT_fk FOREIGN KEY (Practitioner_Ref)
+ REFERENCES PRACTITIONER (Practitioner_ID);
+ 
+ ALTER TABLE APPOINTMENT ADD CONSTRAINT PATIENT_APPOINTMENT_fk FOREIGN KEY (Patient_Ref)
+ REFERENCES PATIENT (Patient_ID);
+
+
+-- query for inserting csv files-- 
+BULK INSERT Patient
+FROM 'C:\15_PatientData.csv'
+WITH (
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n'
+);
+ SELECT * FROM Patient;
+ 
+
+BULK INSERT practitionertype
+FROM 'C:\17_PractitionerTypeData.csv'
+WITH (
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n'
+);
+
+SELECT * FROM PractitionerType;
+
+
+ 
+  BULK INSERT Practitioner
+FROM 'C:\16_PractitionerData.csv'
+WITH (
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n'
+    
+);
+    
+SELECT * FROM Practitioner;
+ 
+BULK INSERT Weekdays
+FROM "C:/WeekDaysData.csv"
+WITH (
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\r\n'
+    
+);
+
+SELECT * FROM WeekDays;
+ 
+
+
+BULK INSERT Availability
+FROM 'C:\13_AvailabilityData.csv'
+WITH (
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n'
+    
+);
+
+
+
+
+SELECT * FROM Availability
+
+BULK INSERT Appointment
+FROM 'C:\12_AppointmentData.csv'
+WITH (
+   FIELDTERMINATOR = ',',       
+    ROWTERMINATOR = '\n'           
+);
+
+SELECT * FROM Appointment;
+
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+
+
+
+ 
